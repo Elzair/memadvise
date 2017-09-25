@@ -10,6 +10,7 @@ extern crate std;
 #[cfg(not(feature = "no_std"))]
 use std::ptr;
 
+#[cfg(unix)]
 extern crate libc;
 
 pub enum Advice {
@@ -34,14 +35,14 @@ pub enum MemAdviseError {
 
 // Unix Section
 
-#[cfg(any(unix))]
+#[cfg(unix)]
 #[inline]
 pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
                             -> Result<(), MemAdviseError> {
     unix::advise_unix(address, length, advice)
 }
 
-#[cfg(any(unix))]
+#[cfg(unix)]
 mod unix {
     use super::*;
     
@@ -104,11 +105,7 @@ mod unix {
         #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd", target_os = "dragonfly", target_os = "openbsd", target_os = "netbsd", target_os = "android"))]
         #[test]
         fn test_unix_memadvise() {
-            let page_size = unsafe {
-                libc::sysconf(libc::_SC_PAGESIZE) as libc::size_t
-            };
-            
-            let length = 2 * page_size;
+            let length = 2 * page_size::get();
 
             let address = unsafe {
                 libc::mmap(ptr::null_mut(),
@@ -153,9 +150,9 @@ mod unix {
         #[test]
         fn test_unix_memadvise_zero_length() {
             let mut test: usize = 3;
-            let p = &mut test as *mut usize as *mut ();
+            let address = &mut test as *mut usize as *mut ();
 
-            match advise_unix(p, 0, Advice::Normal) {
+            match advise_unix(address, 0, Advice::Normal) {
                 Err(MemAdviseError::InvalidLength) => {},
                 _ => { assert!(false); },
             }
@@ -163,14 +160,10 @@ mod unix {
 
         #[test]
         fn test_unix_memadvise_unaligned_address() {
-            let page_size = unsafe {
-                libc::sysconf(libc::_SC_PAGESIZE) as usize
-            };
+            let mut test = page_size::get() + 1;
+            let address = &mut test as *mut usize as *mut ();
 
-            let mut test = page_size + 1;
-            let p = &mut test as *mut usize as *mut ();
-
-            match advise_unix(p, 64, Advice::Normal) {
+            match advise_unix(address, 64, Advice::Normal) {
                 Err(MemAdviseError::UnalignedAddress) => {},
                 _ => { assert!(false); },
             }
@@ -178,13 +171,12 @@ mod unix {
 
         #[test]
         fn test_unix_memadvise_invalid_range() {
-            let page_size = unsafe {
-                libc::sysconf(libc::_SC_PAGESIZE) as usize
-            };
+            // We cannot use a value of 0 for the address, since that would
+            // be caught by the null pointer check. The second page of memory
+            // in the address space is almost certainly invalid.
+            let address = page_size::get() as *mut usize as *mut ();
 
-            let p = page_size as *mut usize as *mut ();
-
-            match advise_unix(p, 64, Advice::Normal) {
+            match advise_unix(address, 64, Advice::Normal) {
                 Err(MemAdviseError::InvalidRange) => {},
                 _ => { assert!(false); },
             }
@@ -253,6 +245,40 @@ mod windows {
         }
         else {
             Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_windows_memadvise_null_address() {
+            match advise_windows(ptr::null_mut(), 0, Advice::Normal) {
+                Err(MemAdviseError::NullAddress) => {},
+                _ => { assert!(false); },
+            }
+        }
+
+        #[test]
+        fn test_windows_memadvise_zero_length() {
+            let mut test: usize = 3;
+            let address = &mut test as *mut usize as *mut ();
+
+            match advise_windows(address, 0, Advice::Normal) {
+                Err(MemAdviseError::InvalidLength) => {},
+                _ => { assert!(false); },
+            }
+        }
+
+        #[test]
+        fn test_windows_memadvise_invalid_range() {
+            let address = page_size::get() as *mut usize as *mut ();
+
+            match advise_unix(address, 64, Advice::Normal) {
+                Err(MemAdviseError::InvalidRange) => {},
+                _ => { assert!(false); },
+            }
         }
     }
 }
