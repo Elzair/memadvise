@@ -398,7 +398,7 @@ mod tests {
     
     #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd", target_os = "dragonfly", target_os = "openbsd", target_os = "netbsd", target_os = "android"))]
     #[test]
-    fn test_memadvise() {
+    fn test_memadvise_most_unices() {
         let page_size = unsafe {
             libc::sysconf(libc::_SC_PAGESIZE) as libc::size_t
         };
@@ -437,7 +437,44 @@ mod tests {
         assert_eq!(res, 0);
     }
 
-    #[cfg(not(any(unix)))]
+    #[cfg(windows)]
+    #[test]
+    fn test_memadvise_windows() {
+        use winapi::basetsd::SIZE_T;
+        use winapi::kernel32::{VirtualAlloc, VirtualFree};
+        use winapi::minwindef::{BOOL, DWORD, LPVOID};
+        use winapi::winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE};
+
+        let address = unsafe {
+            VirtualAlloc(
+                ptr::null_mut() as LPVOID,
+                length,
+                MEM_COMMIT | MEM_RESERVE,
+                PAGE_READWRITE
+            )
+        };
+
+        assert_ne!(address, ptr::null_mut() as LPVOID);
+
+        let length = page_size::get() as SIZE_T;
+        
+        match advise(address, length, Advice::WillNeed) {
+            Ok(_) => {},
+            _ => { assert!(false); },
+        }
+        
+        match advise(address, length, Advice::DontNeed) {
+            Ok(_) => {},
+            _ => { assert!(false); },
+        }
+
+        let res = unsafe { VirtualFree(address, 0, MEM_RELEASE) };
+
+        assert_ne!(res, 0 as BOOL);
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    #[test]
     fn test_memadvise_stub() {
         advise(ptr::null_mut(), 0, Advice::Normal);
     }
