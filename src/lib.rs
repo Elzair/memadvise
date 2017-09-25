@@ -220,7 +220,7 @@ mod windows {
 
         // Windows only really supports `Advice::WillNeed`.
         // `Advice::{Random, Sequential, WillNeed}` all tell the system to
-        // prefetch memory. `Advice::{Normal, DontNeed}` do not do anything.
+        // prefetch memory. `Advice::{DontNeed, Normal}` do not do anything.
         match advice {
             Advice::Normal | Advice::DontNeed => {
                 return Ok(());
@@ -275,7 +275,7 @@ mod windows {
         fn test_windows_memadvise_invalid_range() {
             let address = page_size::get() as *mut usize as *mut ();
 
-            match advise_unix(address, 64, Advice::Normal) {
+            match advise_windows(address, 64, Advice::Normal) {
                 Err(MemAdviseError::InvalidRange) => {},
                 _ => { assert!(false); },
             }
@@ -290,6 +290,66 @@ mod windows {
 #[inline]
 pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
                             -> Result<(), MemAdviseError> {
+    stub::advise_stub(address, length, advice)
+}
+
+#[cfg(not(any(unix, windows)))]
+mod stub {
+    use super::*;
+    
+    #[inline]
+    pub fn advise_stub(address: *mut (),
+                       length: usize,
+                       advice: Advice)
+                       -> Result<(), MemAdviseError>
+    {
+        // Check for null pointer.
+        if address == ptr::null_mut() {
+            return Err(MemAdviseError::NullAddress);
+        }
+
+        // Check for invalid length.
+        if length == 0 {
+            return Err(MemAdviseError::InvalidLength);
+        }
+
+        Ok(())
+    }
+    
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_stub_memadvise() {
+            let test: usize = 3;
+            let address = &test as *mut usize as *mut ();
+
+            match advise_stub(address, 64, Advice::Normal) {
+                Ok(_) => {},
+                _ => { assert!(false); },
+            }
+        }
+
+        #[test]
+        fn test_windows_memadvise_null_address() {
+            match advise_stub(ptr::null_mut(), 0, Advice::Normal) {
+                Err(MemAdviseError::NullAddress) => {},
+                _ => { assert!(false); },
+            }
+        }
+
+        #[test]
+        fn test_windows_memadvise_zero_length() {
+            let mut test: usize = 3;
+            let address = &mut test as *mut usize as *mut ();
+
+            match advise_stub(address, 0, Advice::Normal) {
+                Err(MemAdviseError::InvalidLength) => {},
+                _ => { assert!(false); },
+            }
+        }
+    }
 }
 
 #[cfg(test)]
