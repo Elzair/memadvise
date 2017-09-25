@@ -199,8 +199,11 @@ pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
 mod windows {
     use super::*;
 
-    use winapi::memoryapi::{PWIN32_MEMORY_RANGE_ENTRY, WIN32_MEMORY_RANGE_ENTRY};
+    use winapi::basetsd::{SIZE_T, ULONG_PTR};
     use winapi::kernel32::{GetCurrentProcess, PrefetchVirtualMemory};
+    use winapi::memoryapi::{PWIN32_MEMORY_RANGE_ENTRY, WIN32_MEMORY_RANGE_ENTRY};
+    use winapi::minwindef::BOOL;
+    use winapi::winnt::PVOID;
     
     #[inline]
     pub fn advise_windows(address: *mut (),
@@ -228,16 +231,18 @@ mod windows {
             _ => {},
         }
 
-        let memrange = WIN32_MEMORY_RANGE_ENTRY {
-            VirtualAddress: address as winapi::winnt::PVOID,
-            NumberOfBytes: length as winapi::basetsd::SIZE_T,
+        let mut memrange = WIN32_MEMORY_RANGE_ENTRY {
+            VirtualAddress: address as PVOID,
+            NumberOfBytes: length as SIZE_T,
         };
 
-        let res = PrefetchVirtualMemory(
-            GetCurrentProcess(),
-            1 as winapi::basetsd::ULONG_PTR,
-            &memrange as PWIN32_MEMORY_RANGE_ENTRY
-        );
+        let res = unsafe {
+            PrefetchVirtualMemory(
+                GetCurrentProcess(),
+                1 as ULONG_PTR,
+                &mut memrange as PWIN32_MEMORY_RANGE_ENTRY
+            )
+        };
 
         // Check that function completed successfully.
         if res == 0 {
@@ -251,6 +256,41 @@ mod windows {
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        use winapi::basetsd::SIZE_T;
+        use winapi::kernel32::{VirtualAlloc, VirtualFree};
+        use winapi::minwindef::{BOOL, DWORD, LPVOID};
+        use winapi::winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE};
+
+        #[test]
+        fn test_windows_memadvise() {
+            let address = unsafe {
+                VirtualAlloc(
+                    ptr::null_mut() as LPVOID,
+                    length,
+                    MEM_COMMIT | MEM_RESERVE,
+                    PAGE_READWRITE
+                )
+            };
+
+            assert_ne!(address, ptr::null_mut() as LPVOID);
+
+            let length = page_size::get() as SIZE_T;
+            
+            match advise_windows(address, length, Advice::WillNeed) {
+                Ok(_) => {},
+                _ => { assert!(false); },
+            }
+                        
+            match advise_windows(address, length, Advice::DontNeed) {
+                Ok(_) => {},
+                _ => { assert!(false); },
+            }
+
+            let res = unsafe { VirtualFree(address, 0, MEM_RELEASE) };
+
+            assert_ne!(res, 0 as BOOL);
+        }
 
         #[test]
         fn test_windows_memadvise_null_address() {
