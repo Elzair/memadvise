@@ -2,12 +2,12 @@
 
 extern crate page_size;
 
-#[cfg(feature = "no-std")]
+#[cfg(feature = "no_std")]
 use core::ptr;
 
-#[cfg(not(feature = "no-std"))]
+#[cfg(not(feature = "no_std"))]
 extern crate std;
-#[cfg(not(feature = "no-std"))]
+#[cfg(not(feature = "no_std"))]
 use std::ptr;
 
 extern crate libc;
@@ -99,7 +99,7 @@ mod unix {
     mod tests {
         use super::*;
 
-        // Anonymous maps are not part of the supported standard, but they are widely available.
+        // Anonymous maps are not part of the POSIX standard, but they are widely available.
         // We use `libc::MAP_ANON` since NetBSD does not support `libc::MAP_ANONYMOUS`.
         #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd", target_os = "dragonfly", target_os = "openbsd", target_os = "netbsd", target_os = "android"))]
         #[test]
@@ -192,9 +192,75 @@ mod unix {
     }
 }
 
+// Windows Section
+#[cfg(windows)]
+extern crate winapi;
+
+#[cfg(windows)]
+#[inline]
+pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
+                     -> Result<(), MemAdviseError> {
+    windows::advise_windows(address, length, advice)
+}
+
+#[cfg(windows)]
+mod windows {
+    use super::*;
+
+    use winapi::memoryapi::{PWIN32_MEMORY_RANGE_ENTRY, WIN32_MEMORY_RANGE_ENTRY};
+    use winapi::kernel32::{GetCurrentProcess, PrefetchVirtualMemory};
+    
+    #[inline]
+    pub fn advise_windows(address: *mut (),
+                          length: usize,
+                          advice: Advice)
+                          -> Result<(), MemAdviseError>
+    {
+        // Check for null pointer.
+        if address == ptr::null_mut() {
+            return Err(MemAdviseError::NullAddress);
+        }
+
+        // Check for invalid length.
+        if length == 0 {
+            return Err(MemAdviseError::InvalidLength);
+        }
+
+        // Windows only really supports `Advice::WillNeed`.
+        // `Advice::{Random, Sequential, WillNeed}` all tell the system to
+        // prefetch memory. `Advice::{Normal, DontNeed}` do not do anything.
+        match advice {
+            Advice::Normal | Advice::DontNeed => {
+                return Ok(());
+            },
+            _ => {},
+        }
+
+        let memrange = WIN32_MEMORY_RANGE_ENTRY {
+            VirtualAddress: address as winapi::winnt::PVOID,
+            NumberOfBytes: length as winapi::basetsd::SIZE_T,
+        };
+
+        let res = PrefetchVirtualMemory(
+            GetCurrentProcess(),
+            1 as winapi::basetsd::ULONG_PTR,
+            &memrange as PWIN32_MEMORY_RANGE_ENTRY
+        );
+
+        // Check that function completed successfully.
+        if res == 0 {
+            Err(MemAdviseError::InvalidRange)
+        }
+        else {
+            Ok(())
+        }
+    }
+}
+
+
 // Stub Section
 
-#[cfg(not(any(unix)))]
+#[cfg(not(any(unix, windows)))]
 #[inline]
 pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
                             -> Result<(), MemAdviseError> {

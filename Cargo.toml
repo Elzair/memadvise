@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["Philip Woods <elzairthesorcerer@gmail.com>"]
 
 [features]
-no-std = []
+no_std = []
 
 [dependencies]
-page_size = "^0.2.0"
+page_size = "^0.2.1"
 libc = "^0.2.31"
