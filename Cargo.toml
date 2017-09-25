@@ -3,5 +3,9 @@ name = "memadvise"
 version = "0.1.0"
 authors = ["Philip Woods <elzairthesorcerer@gmail.com>"]
 
+[features]
+no-std = []
+
 [dependencies]
-libc = "^0.2.30"
+page_size = "^0.2.0"
+libc = "^0.2.31"

@@ -1,6 +1,14 @@
 #![no_std]
 
+extern crate page_size;
+
+#[cfg(feature = "no-std")]
 use core::ptr;
+
+#[cfg(not(feature = "no-std"))]
+extern crate std;
+#[cfg(not(feature = "no-std"))]
+use std::ptr;
 
 extern crate libc;
 
@@ -55,7 +63,7 @@ mod unix {
 
         // Ensure `address` is a multiple of the system page size.
         // Assume the page size is a power of 2.
-        let page_size = get_page_size();
+        let page_size = page_size::get();
         let ptr_usize = address as usize;
 
         if ptr_usize & !(page_size - 1) != ptr_usize {
@@ -87,20 +95,9 @@ mod unix {
         }
     }
 
-    #[inline]
-    fn get_page_size() -> usize {
-        unsafe { libc::sysconf(libc::_SC_PAGESIZE) as usize }
-    }
-
     #[cfg(test)]
     mod tests {
         use super::*;
-        
-        #[test]
-        fn test_get_page_size() {
-            #[allow(unused_variables)]
-            let page_size = get_page_size();
-        }
 
         // Anonymous maps are not part of the supported standard, but they are widely available.
         // We use `libc::MAP_ANON` since NetBSD does not support `libc::MAP_ANONYMOUS`.
