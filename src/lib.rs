@@ -39,18 +39,24 @@ pub enum MemAdviseError {
 #[inline]
 pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
                             -> Result<(), MemAdviseError> {
-    unix::advise_unix(address, length, advice)
+    unix::advise(address, length, advice)
 }
 
 #[cfg(unix)]
 mod unix {
-    use super::*;
+    use std::ptr;
+
+    use libc::{c_void, posix_madvise, POSIX_MADV_DONTNEED, POSIX_MADV_NORMAL, POSIX_MADV_RANDOM, POSIX_MADV_SEQUENTIAL, POSIX_MADV_WILLNEED};
+
+    use page_size;
+    
+    use super::{Advice, MemAdviseError};
     
     #[inline]
-    pub fn advise_unix(address: *mut (),
-                       length: usize,
-                       advice: Advice)
-                       -> Result<(), MemAdviseError>
+    pub fn advise(address: *mut (),
+                  length: usize,
+                  advice: Advice)
+                  -> Result<(), MemAdviseError>
     {
         // Check for null pointer.
         if address == ptr::null_mut() {
@@ -73,17 +79,17 @@ mod unix {
 
         // Get Advice value
         let advice_internal = match advice {
-            Advice::DontNeed => libc::POSIX_MADV_DONTNEED,
-            Advice::Normal => libc::POSIX_MADV_NORMAL,
-            Advice::Random => libc::POSIX_MADV_RANDOM,
-            Advice::Sequential => libc::POSIX_MADV_SEQUENTIAL,
-            Advice::WillNeed => libc::POSIX_MADV_WILLNEED,
+            Advice::DontNeed => POSIX_MADV_DONTNEED,
+            Advice::Normal => POSIX_MADV_NORMAL,
+            Advice::Random => POSIX_MADV_RANDOM,
+            Advice::Sequential => POSIX_MADV_SEQUENTIAL,
+            Advice::WillNeed => POSIX_MADV_WILLNEED,
         };
 
         let res = unsafe {
-            libc::posix_madvise(address as *mut libc::c_void,
-                                length,
-                                advice_internal)
+            posix_madvise(address as *mut c_void,
+                          length,
+                          advice_internal)
         };
 
         if res == 0 {
@@ -98,6 +104,8 @@ mod unix {
 
     #[cfg(test)]
     mod tests {
+        use libc::{MAP_ANON, MAP_PRIVATE, PROT_READ, mmap, munmap};
+        
         use super::*;
 
         // Anonymous maps are not part of the POSIX standard, but they are widely available.
@@ -108,32 +116,32 @@ mod unix {
             let length = 2 * page_size::get();
 
             let address = unsafe {
-                libc::mmap(ptr::null_mut(),
-                           length,
-                           libc::PROT_READ,
-                           libc::MAP_PRIVATE | libc::MAP_ANON,
-                           -1,
-                           0)
+                mmap(ptr::null_mut(),
+                     length,
+                     PROT_READ,
+                     MAP_PRIVATE | MAP_ANON,
+                     -1,
+                     0)
             };
             
             assert_ne!(address, ptr::null_mut());
             
-            match advise_unix(address as *mut (),
-                              length as usize,
-                              Advice::WillNeed) {
+            match advise(address as *mut (),
+                         length as usize,
+                         Advice::WillNeed) {
                 Ok(_) => {},
                 _ => { assert!(false); },
             }
             
-            match advise_unix(address as *mut (),
-                              length as usize,
-                              Advice::DontNeed) {
+            match advise(address as *mut (),
+                         length as usize,
+                         Advice::DontNeed) {
                 Ok(_) => {},
                 _ => { assert!(false); },
             }
 
             let res = unsafe {
-                libc::munmap(address, length)
+                munmap(address, length)
             };
             
             assert_eq!(res, 0);
@@ -141,7 +149,7 @@ mod unix {
 
         #[test]
         fn test_unix_memadvise_null_address() {
-            match advise_unix(ptr::null_mut(), 0, Advice::Normal) {
+            match advise(ptr::null_mut(), 0, Advice::Normal) {
                 Err(MemAdviseError::NullAddress) => {},
                 _ => { assert!(false); },
             }
@@ -152,7 +160,7 @@ mod unix {
             let mut test: usize = 3;
             let address = &mut test as *mut usize as *mut ();
 
-            match advise_unix(address, 0, Advice::Normal) {
+            match advise(address, 0, Advice::Normal) {
                 Err(MemAdviseError::InvalidLength) => {},
                 _ => { assert!(false); },
             }
@@ -163,7 +171,7 @@ mod unix {
             let mut test = page_size::get() + 1;
             let address = &mut test as *mut usize as *mut ();
 
-            match advise_unix(address, 64, Advice::Normal) {
+            match advise(address, 64, Advice::Normal) {
                 Err(MemAdviseError::UnalignedAddress) => {},
                 _ => { assert!(false); },
             }
@@ -176,7 +184,7 @@ mod unix {
             // in the address space is almost certainly invalid.
             let address = page_size::get() as *mut usize as *mut ();
 
-            match advise_unix(address, 64, Advice::Normal) {
+            match advise(address, 64, Advice::Normal) {
                 Err(MemAdviseError::InvalidRange) => {},
                 _ => { assert!(false); },
             }
@@ -192,12 +200,12 @@ extern crate winapi;
 #[inline]
 pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
                      -> Result<(), MemAdviseError> {
-    windows::advise_windows(address, length, advice)
+    windows::advise(address, length, advice)
 }
 
 #[cfg(windows)]
 mod windows {
-    use super::*;
+    use super::{Advice, MemAdviseError};
 
     use winapi::basetsd::{SIZE_T, ULONG_PTR};
     use winapi::kernel32::{GetCurrentProcess, PrefetchVirtualMemory};
@@ -206,10 +214,10 @@ mod windows {
     use winapi::winnt::PVOID;
     
     #[inline]
-    pub fn advise_windows(address: *mut (),
-                          length: usize,
-                          advice: Advice)
-                          -> Result<(), MemAdviseError>
+    pub fn advise(address: *mut (),
+                  length: usize,
+                  advice: Advice)
+                  -> Result<(), MemAdviseError>
     {
         // Check for null pointer.
         if address == ptr::null_mut() {
@@ -294,7 +302,7 @@ mod windows {
 
         #[test]
         fn test_windows_memadvise_null_address() {
-            match advise_windows(ptr::null_mut(), 0, Advice::Normal) {
+            match advise(ptr::null_mut(), 0, Advice::Normal) {
                 Err(MemAdviseError::NullAddress) => {},
                 _ => { assert!(false); },
             }
@@ -305,7 +313,7 @@ mod windows {
             let mut test: usize = 3;
             let address = &mut test as *mut usize as *mut ();
 
-            match advise_windows(address, 0, Advice::Normal) {
+            match advise(address, 0, Advice::Normal) {
                 Err(MemAdviseError::InvalidLength) => {},
                 _ => { assert!(false); },
             }
@@ -315,7 +323,7 @@ mod windows {
         fn test_windows_memadvise_invalid_range() {
             let address = page_size::get() as *mut usize as *mut ();
 
-            match advise_windows(address, 64, Advice::Normal) {
+            match advise(address, 64, Advice::Normal) {
                 Err(MemAdviseError::InvalidRange) => {},
                 _ => { assert!(false); },
             }
@@ -330,18 +338,18 @@ mod windows {
 #[inline]
 pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
                             -> Result<(), MemAdviseError> {
-    stub::advise_stub(address, length, advice)
+    stub::advise(address, length, advice)
 }
 
 #[cfg(not(any(unix, windows)))]
 mod stub {
-    use super::*;
+    use super::{Advice, MemAdviseError};
     
     #[inline]
-    pub fn advise_stub(address: *mut (),
-                       length: usize,
-                       advice: Advice)
-                       -> Result<(), MemAdviseError>
+    pub fn advise(address: *mut (),
+                  length: usize,
+                  advice: Advice)
+                  -> Result<(), MemAdviseError>
     {
         // Check for null pointer.
         if address == ptr::null_mut() {
@@ -365,7 +373,7 @@ mod stub {
             let test: usize = 3;
             let address = &test as *mut usize as *mut ();
 
-            match advise_stub(address, 64, Advice::Normal) {
+            match advise(address, 64, Advice::Normal) {
                 Ok(_) => {},
                 _ => { assert!(false); },
             }
@@ -373,7 +381,7 @@ mod stub {
 
         #[test]
         fn test_windows_memadvise_null_address() {
-            match advise_stub(ptr::null_mut(), 0, Advice::Normal) {
+            match advise(ptr::null_mut(), 0, Advice::Normal) {
                 Err(MemAdviseError::NullAddress) => {},
                 _ => { assert!(false); },
             }
@@ -384,7 +392,7 @@ mod stub {
             let mut test: usize = 3;
             let address = &mut test as *mut usize as *mut ();
 
-            match advise_stub(address, 0, Advice::Normal) {
+            match advise(address, 0, Advice::Normal) {
                 Err(MemAdviseError::InvalidLength) => {},
                 _ => { assert!(false); },
             }
