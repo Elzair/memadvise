@@ -1,14 +1,12 @@
 #![no_std]
 
+//! This crate advises the system about the usage patterns of memory.
+
 extern crate page_size;
 
-#[cfg(feature = "no_std")]
-use core::ptr;
 
 #[cfg(not(feature = "no_std"))]
 extern crate std;
-#[cfg(not(feature = "no_std"))]
-use std::ptr;
 
 #[cfg(unix)]
 extern crate libc;
@@ -21,11 +19,13 @@ pub enum Advice {
     DontNeed,
 }
 
+/// This function gives the system advice about a certain block of memory.
 pub fn advise(address: *mut (), length: usize, advice: Advice)
                      -> Result<(), MemAdviseError> {
     advise_helper(address, length, advice)
 }
 
+/// The possible errors returned by `advise()`
 pub enum MemAdviseError {
     NullAddress,
     InvalidLength,
@@ -44,6 +44,9 @@ pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
 
 #[cfg(unix)]
 mod unix {
+    #[cfg(feature = "no_std")]
+    use core::ptr;
+    #[cfg(not(feature = "no_std"))]
     use std::ptr;
 
     use libc::{c_void, posix_madvise, POSIX_MADV_DONTNEED, POSIX_MADV_NORMAL, POSIX_MADV_RANDOM, POSIX_MADV_SEQUENTIAL, POSIX_MADV_WILLNEED};
@@ -195,6 +198,8 @@ mod unix {
 // Windows Section
 #[cfg(windows)]
 extern crate winapi;
+#[cfg(windows)]
+extern crate kernel32;
 
 #[cfg(windows)]
 #[inline]
@@ -205,10 +210,16 @@ pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
 
 #[cfg(windows)]
 mod windows {
+    #[cfg(feature = "no_std")]
+    use core::ptr;
+    #[cfg(not(feature = "no_std"))]
+    use std::ptr;
+
     use super::{Advice, MemAdviseError};
 
+    use kernel32::{GetCurrentProcess, PrefetchVirtualMemory};
+
     use winapi::basetsd::{SIZE_T, ULONG_PTR};
-    use winapi::kernel32::{GetCurrentProcess, PrefetchVirtualMemory};
     use winapi::memoryapi::{PWIN32_MEMORY_RANGE_ENTRY, WIN32_MEMORY_RANGE_ENTRY};
     use winapi::minwindef::BOOL;
     use winapi::winnt::PVOID;
@@ -265,8 +276,9 @@ mod windows {
     mod tests {
         use super::*;
 
+        use kernel32::{VirtualAlloc, VirtualFree};
+
         use winapi::basetsd::SIZE_T;
-        use winapi::kernel32::{VirtualAlloc, VirtualFree};
         use winapi::minwindef::{BOOL, DWORD, LPVOID};
         use winapi::winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE};
 
@@ -343,6 +355,11 @@ pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
 
 #[cfg(not(any(unix, windows)))]
 mod stub {
+    #[cfg(feature = "no_std")]
+    use core::ptr;
+    #[cfg(not(feature = "no_std"))]
+    use std::ptr;
+
     use super::{Advice, MemAdviseError};
     
     #[inline]
@@ -402,44 +419,51 @@ mod stub {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "no_std")]
+    use core::ptr;
+    #[cfg(not(feature = "no_std"))]
+    use std::ptr;
+
     use super::*;
     
     #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd", target_os = "dragonfly", target_os = "openbsd", target_os = "netbsd", target_os = "android"))]
     #[test]
     fn test_memadvise_most_unices() {
+        use libc::{PROT_READ, MAP_PRIVATE, MAP_ANON, _SC_PAGESIZE, mmap, munmap, size_t, sysconf};
+        
         let page_size = unsafe {
-            libc::sysconf(libc::_SC_PAGESIZE) as libc::size_t
+            sysconf(_SC_PAGESIZE) as size_t
         };
         
         let length = 2 * page_size;
 
         let address = unsafe {
-            libc::mmap(ptr::null_mut(),
-                       length,
-                       libc::PROT_READ,
-                       libc::MAP_PRIVATE | libc::MAP_ANON,
-                       -1,
-                       0)
+            mmap(ptr::null_mut(),
+                 length,
+                 PROT_READ,
+                 MAP_PRIVATE | MAP_ANON,
+                 -1,
+                 0)
         };
         
         assert_ne!(address, ptr::null_mut());
         
         match advise(address as *mut (),
-                          length as usize,
-                          Advice::WillNeed) {
+                     length as usize,
+                     Advice::WillNeed) {
             Ok(_) => {},
             _ => { assert!(false); },
         }
         
         match advise(address as *mut (),
-                          length as usize,
-                          Advice::DontNeed) {
+                     length as usize,
+                     Advice::DontNeed) {
             Ok(_) => {},
             _ => { assert!(false); },
         }
 
         let res = unsafe {
-            libc::munmap(address, length)
+            munmap(address, length)
         };
         
         assert_eq!(res, 0);
@@ -448,8 +472,9 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn test_memadvise_windows() {
+        use kernel32::{VirtualAlloc, VirtualFree};
+
         use winapi::basetsd::SIZE_T;
-        use winapi::kernel32::{VirtualAlloc, VirtualFree};
         use winapi::minwindef::{BOOL, DWORD, LPVOID};
         use winapi::winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE};
 
