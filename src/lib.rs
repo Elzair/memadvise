@@ -1,9 +1,40 @@
 #![no_std]
 
-//! This crate advises the system about the usage patterns of memory.
+//! This crate provides the operating system with hints about memory access
+//! patterns. For example, if the user calls memadvise::advise() with
+//! Advice::Sequential, the kernel may start bringing memory pages into
+//! RAM (if they were on disk) starting at the beginning of the block of
+//! memory passed.
+//!
+//! # Example
+//!
+//! This example shows the bas
+//!
+//! ```rust,ignore
+//! extern crate memadvise;
+//! extern crate page_size;
+//! 
+//! // Allocate block of memory in a system specific manner.
+//! 
+//! // Get portion of memory block (must be aligned to system page size).
+//! let address: *mut () = ... 
+//! let length = 320000;
+//! 
+//! // Tell the OS to start loading this portion into RAM starting at the beginning.
+//! memadvise::advise(address, length, Advice::Sequential).unwrap();
+//! 
+//! // Do something with this portion of memory.
+//! 
+//! // Tell the OS we do not need this portion right now.
+//! // That way, the OS can safely swap it out to disk.
+//! memadvise::advise(address, length, Advice::DontNeed).unwrap();
+//!
+//! // Do some other stuff.
+//!
+//! // Be sure to free block of memory (system specific) at the end.
+//! ```
 
 extern crate page_size;
-
 
 #[cfg(not(feature = "no_std"))]
 extern crate std;
@@ -12,14 +43,27 @@ extern crate std;
 extern crate libc;
 
 pub enum Advice {
+    /// No special usage
     Normal,
+    /// Will access memory block in order from low address to high address; OS should aggressively read ahead 
     Sequential,
+    /// Will access random chunks from memory block; OS may not have to read ahead
     Random,
+    /// Will need to access this memory block soon; OS should read ahead
     WillNeed,
+    /// Will NOT need to access this memory block soon
     DontNeed,
 }
 
 /// This function gives the system advice about a certain block of memory.
+///
+/// # Arguments
+///
+/// * address - a raw pointer to a memory address that must be a multiple of the system's page size
+///
+/// * length - size of memory block in bytes (must be nonzero)
+///
+/// * advice - hint to pass to the operating system
 pub fn advise(address: *mut (), length: usize, advice: Advice)
                      -> Result<(), MemAdviseError> {
     advise_helper(address, length, advice)
@@ -27,9 +71,13 @@ pub fn advise(address: *mut (), length: usize, advice: Advice)
 
 /// The possible errors returned by `advise()`
 pub enum MemAdviseError {
+    /// Passed null pointer in `address` field
     NullAddress,
+    /// Invalid value for `length`
     InvalidLength,
+    /// `address` is not properly aligned
     UnalignedAddress,
+    /// Memory block is invalid for some other reason
     InvalidRange,
 }
 
@@ -215,15 +263,17 @@ mod windows {
     #[cfg(not(feature = "no_std"))]
     use std::ptr;
 
-    use super::{Advice, MemAdviseError};
-
     use kernel32::{GetCurrentProcess, PrefetchVirtualMemory};
 
     use winapi::basetsd::{SIZE_T, ULONG_PTR};
     use winapi::memoryapi::{PWIN32_MEMORY_RANGE_ENTRY, WIN32_MEMORY_RANGE_ENTRY};
     use winapi::minwindef::BOOL;
     use winapi::winnt::PVOID;
+
+    use page_size;
     
+    use super::{Advice, MemAdviseError};
+
     #[inline]
     pub fn advise(address: *mut (),
                   length: usize,
@@ -238,6 +288,15 @@ mod windows {
         // Check for invalid length.
         if length == 0 {
             return Err(MemAdviseError::InvalidLength);
+        }
+
+        // Ensure `address` is a multiple of the system page size.
+        // Assume the page size is a power of 2.
+        let page_size = page_size::get();
+        let ptr_usize = address as usize;
+
+        if ptr_usize & !(page_size - 1) != ptr_usize {
+            return Err(MemAdviseError::UnalignedAddress);
         }
 
         // Windows only really supports `Advice::WillNeed`.
@@ -274,13 +333,13 @@ mod windows {
 
     #[cfg(test)]
     mod tests {
-        use super::*;
-
         use kernel32::{VirtualAlloc, VirtualFree};
 
         use winapi::basetsd::SIZE_T;
         use winapi::minwindef::{BOOL, DWORD, LPVOID};
         use winapi::winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE};
+
+        use super::*;
 
         #[test]
         fn test_windows_memadvise() {
@@ -327,6 +386,17 @@ mod windows {
 
             match advise(address, 0, Advice::Normal) {
                 Err(MemAdviseError::InvalidLength) => {},
+                _ => { assert!(false); },
+            }
+        }
+
+        #[test]
+        fn test_windows_memadvise_unaligned_address() {
+            let mut test = page_size::get() + 1;
+            let address = &mut test as *mut usize as *mut ();
+
+            match advise(address, 64, Advice::Normal) {
+                Err(MemAdviseError::UnalignedAddress) => {},
                 _ => { assert!(false); },
             }
         }
