@@ -8,7 +8,7 @@
 //!
 //! # Example
 //!
-//! This example shows the bas
+//! This example shows the basic usage of the crate.
 //!
 //! ```rust,ignore
 //! extern crate memadvise;
@@ -34,6 +34,10 @@
 //! // Be sure to free block of memory (system specific) at the end.
 //! ```
 
+// `const_fn` is needed for `spin::Once`.
+#![cfg_attr(feature = "no_std", feature(const_fn))]
+#![cfg_attr(all(feature = "no_std", not(windows)), allow(unused_extern_crates))]
+
 extern crate page_size;
 
 #[cfg(not(feature = "no_std"))]
@@ -41,6 +45,13 @@ extern crate std;
 
 #[cfg(unix)]
 extern crate libc;
+
+#[cfg(windows)]
+extern crate winapi;
+#[cfg(windows)]
+extern crate kernel32;
+#[cfg(feature = "no_std")]
+extern crate spin;
 
 pub enum Advice {
     /// No special usage
@@ -244,10 +255,6 @@ mod unix {
 }
 
 // Windows Section
-#[cfg(windows)]
-extern crate winapi;
-#[cfg(windows)]
-extern crate kernel32;
 
 #[cfg(windows)]
 #[inline]
@@ -263,16 +270,26 @@ mod windows {
     #[cfg(not(feature = "no_std"))]
     use std::ptr;
 
-    use kernel32::{GetCurrentProcess, PrefetchVirtualMemory};
+    use kernel32::{GetCurrentProcess, PrefetchVirtualMemory, VerifyVersionInfoA, VerSetConditionMask};
 
     use winapi::basetsd::{SIZE_T, ULONG_PTR};
     use winapi::memoryapi::{PWIN32_MEMORY_RANGE_ENTRY, WIN32_MEMORY_RANGE_ENTRY};
-    use winapi::minwindef::BOOL;
-    use winapi::winnt::PVOID;
+    use winapi::minwindef::{BOOL, BYTE, DWORD, WORD};
+    use winapi::sysinfoapi::{SYSTEM_INFO, LPSYSTEM_INFO};
+    use winapi::winnt::{DWORDLONG, LPOSVERSIONINFOEXA, OSVERSIONINFOEXA, PVOID, ULONGLONG};
+
+    #[cfg(feature = "no_std")]
+    use spin::Once;
+    #[cfg(not(feature = "no_std"))]
+    use std::sync::{Once, ONCE_INIT};
 
     use page_size;
     
     use super::{Advice, MemAdviseError};
+
+    const VER_MAJORVERSION: DWORD = 0x2;
+    const VER_MINORVERSION: DWORD = 0x1;
+    const VER_GREATER_EQUAL: BYTE = 0x3;
 
     #[inline]
     pub fn advise(address: *mut (),
@@ -314,6 +331,11 @@ mod windows {
             NumberOfBytes: length as SIZE_T,
         };
 
+        // Do nothing if we are running on Windows 7.
+        if !is_prefetch_supported() {
+            return Ok(())
+        }
+
         let res = unsafe {
             PrefetchVirtualMemory(
                 GetCurrentProcess(),
@@ -329,6 +351,58 @@ mod windows {
         else {
             Ok(())
         }
+    }
+
+    // Only Windows8+ supports `kernel32::PrefetchVirtualMemory()`.
+    #[cfg(all(windows, feature = "no_std"))]
+    #[inline]
+    fn is_prefetch_supported() -> bool {
+        static INIT: Once<bool> = Once::new();
+        
+        *INIT.call_once(supported_helper)
+    }
+
+    #[cfg(all(windows, not(feature = "no_std")))]
+    #[inline]
+    fn is_prefetch_supported() -> bool {
+        static INIT: Once = ONCE_INIT;
+        static mut SUPPORTED: bool= 0;
+
+        unsafe {
+            INIT.call_once(|| SUPPORTED = supported_helper());
+            SUPPORTED
+        }
+    }
+
+    #[inline]
+    fn supported_helper() -> bool {
+        // Build type mask.
+        let type_mask = VER_MAJORVERSION | VER_MINORVERSION;
+        
+        // Build condition mask.
+        let cond_mask = unsafe {
+            VerSetConditionMask(
+                0 as ULONGLONG,
+                type_mask,
+                VER_GREATER_EQUAL
+            )
+        };
+        
+        // Initialize version info.
+        let mut info: OSVERSIONINFOEXA = mem::zeroed();
+        info.dwMajorVersion = 6 as DWORD;
+        info.dwMinorVersion = 2 as DWORD;
+
+        // Test version
+        let res = unsafe {
+            VerifyVersionInfoA(
+                &mut info as LPOSVERSIONINFOEXA,
+                type_mask,
+                cond_mask
+            )
+        };
+
+        res != 0
     }
 
     #[cfg(test)]

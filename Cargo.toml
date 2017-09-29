@@ -12,10 +12,11 @@ keywords = ["page", "memory", "ram", "madvise", "prefetchvirtualmemory"]
 categories = ["os"]
 
 [features]
-no_std = ["page_size/no_std"]
+no_std = ["page_size/no_std", "spin"]
 
 [dependencies]
-page_size = "^0.3.0"
+page_size = "^0.4.0"
+spin = { version = "^0.4.5", optional = true }
 
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 libc = "^0.2.31"
