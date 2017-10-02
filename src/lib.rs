@@ -108,7 +108,10 @@ mod unix {
     #[cfg(not(feature = "no_std"))]
     use std::ptr;
 
-    use libc::{c_void, posix_madvise, POSIX_MADV_DONTNEED, POSIX_MADV_NORMAL, POSIX_MADV_RANDOM, POSIX_MADV_SEQUENTIAL, POSIX_MADV_WILLNEED};
+    #[cfg(target_os = "android")]
+    use libc::{c_void, madvise, MADV_DONTNEED, MADV_NORMAL, MADV_RANDOM, MADV_SEQUENTIAL, MADV_WILLNEED};
+    #[cfg(not(target_os = "android"))]
+    use libc::{c_void, posix_madvise as madvise, POSIX_MADV_DONTNEED as MADV_DONTNEED, POSIX_MADV_NORMAL as MADV_NORMAL, POSIX_MADV_RANDOM as MADV_RANDOM, POSIX_MADV_SEQUENTIAL as MADV_SEQUENTIAL, POSIX_MADV_WILLNEED as MADV_WILLNEED};
 
     use page_size;
     
@@ -141,17 +144,17 @@ mod unix {
 
         // Get Advice value
         let advice_internal = match advice {
-            Advice::DontNeed => POSIX_MADV_DONTNEED,
-            Advice::Normal => POSIX_MADV_NORMAL,
-            Advice::Random => POSIX_MADV_RANDOM,
-            Advice::Sequential => POSIX_MADV_SEQUENTIAL,
-            Advice::WillNeed => POSIX_MADV_WILLNEED,
+            Advice::DontNeed => DONTNEED,
+            Advice::Normal => NORMAL,
+            Advice::Random => RANDOM,
+            Advice::Sequential => SEQUENTIAL,
+            Advice::WillNeed => WILLNEED,
         };
 
         let res = unsafe {
-            posix_madvise(address as *mut c_void,
-                          length,
-                          advice_internal)
+            madvise(address as *mut c_void,
+                    length,
+                    advice_internal)
         };
 
         if res == 0 {
@@ -279,7 +282,7 @@ mod windows {
 
     use winapi::basetsd::{SIZE_T, ULONG_PTR};
     use winapi::memoryapi::{PWIN32_MEMORY_RANGE_ENTRY, WIN32_MEMORY_RANGE_ENTRY};
-    use winapi::minwindef::{BYTE, DWORD};
+    use winapi::minwindef::{BYTE, DWORD, ULONG};
     use winapi::winnt::{LPOSVERSIONINFOEXA, OSVERSIONINFOEXA, PVOID, ULONGLONG};
 
     #[cfg(feature = "no_std")]
@@ -344,7 +347,8 @@ mod windows {
             PrefetchVirtualMemory(
                 GetCurrentProcess(),
                 1 as ULONG_PTR,
-                &mut memrange as PWIN32_MEMORY_RANGE_ENTRY
+                &mut memrange as PWIN32_MEMORY_RANGE_ENTRY,
+                0 as ULONG
             )
         };
 

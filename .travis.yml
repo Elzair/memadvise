@@ -12,42 +12,139 @@ script:
 matrix:
   include:
     # Linux
-    # 32-bit stable
+    # i686
+    # stable
     - env: TARGET=i686-unknown-linux-gnu RUN=1
       rust: stable
       addons:
         apt:
           packages:
             - gcc-multilib
-    # 64-bit stable
-        # 64-bit stable.
+    # beta
+    - env: TARGET=i686-unknown-linux-gnu RUN=1
+      rust: beta
+      addons:
+        apt:
+          packages:
+            - gcc-multilib
+    # nightly 
+    - env: TARGET=i686-unknown-linux-gnu RUN=1
+      rust: nightly
+      addons:
+        apt:
+          packages:
+            - gcc-multilib
+    # x86_64
+    # stable
     - env: TARGET=x86_64-unknown-linux-gnu RUN=1 NO_ADD=1
       rust: stable
-    # 64-bit beta.
+    # beta.
     - env: TARGET=x86_64-unknown-linux-gnu RUN=1 NO_ADD=1
       rust: beta
-    # 64-bit nightly.
+    # nightly.
     - env: TARGET=x86_64-unknown-linux-gnu RUN=1 NO_ADD=1
       rust: nightly
     # Mac OS X
+    # i686
+    # stable
     - os: osx
       env: TARGET=i686-apple-darwin RUN=1
+      rust: stable
+    # beta
+    - os: osx
+      env: TARGET=i686-apple-darwin RUN=1
+      rust: beta
+    # nightly
+    - os: osx
+      env: TARGET=i686-apple-darwin RUN=1
+      rust: nightly
+    # x86_64
+    # stable
     - os: osx
       env: TARGET=x86_64-apple-darwin RUN=1 NO_ADD=1
+      rust: stable 
+    # beta
+    - os: osx
+      env: TARGET=x86_64-apple-darwin RUN=1 NO_ADD=1
+      rust: beta 
+    # nightly
+    - os: osx
+      env: TARGET=x86_64-apple-darwin RUN=1 NO_ADD=1
+      rust: nightly 
     # Android
-    # - for x86
+    # i686
+    # stable
     - env: TARGET=i686-linux-android
+      rust: stable
+    # beta
+    - env: TARGET=i686-linux-android
+      rust: beta
+    # nightly
+    - env: TARGET=i686-linux-android
+      rust: nightly
+    # x86_64
+    # stable
     - env: TARGET=x86_64-linux-android
-    # - for ARM
+      rust: stable
+    # beta
+    - env: TARGET=x86_64-linux-android
+      rust: beta
+    # nightly
+    - env: TARGET=x86_64-linux-android
+      rust: nightly
+    # ARM
+    # stable
     - env: TARGET=arm-linux-androideabi
+      rust: stable
+    # beta
+    - env: TARGET=arm-linux-androideabi
+      rust: beta
+    # nightly
+    - env: TARGET=arm-linux-androideabi
+      rust: nightly
+    # AARCH64
+    # stable
     - env: TARGET=aarch64-linux-android
+      rust: stable
+    # beta
+    - env: TARGET=aarch64-linux-android
+      rust: beta
+    # nightly
+    - env: TARGET=aarch64-linux-android
+      rust: nightly
     # IOS
+    # 32-bit
+    # stable
     - os: osx
       osx_image: xcode9
       env: TARGET=i386-apple-ios
+      rust: stable
+    # beta
+    - os: osx
+      osx_image: xcode9
+      env: TARGET=i386-apple-ios
+      rust: beta
+    # nightly
+    - os: osx
+      osx_image: xcode9
+      env: TARGET=i386-apple-ios
+      rust: nightly
+    # 64-bit
+    # stable
     - os: osx
       osx_image: xcode9
       env: TARGET=x86_64-apple-ios
+      rust: stable
+    # beta
+    - os: osx
+      osx_image: xcode9
+      env: TARGET=x86_64-apple-ios
+      rust: beta
+    # nightly
+    - os: osx
+      osx_image: xcode9
+      env: TARGET=x86_64-apple-ios
+      rust: nightly
     # FreeBSD
     - env: TARGET=x86_64-unknown-freebsd
     # Fuchsia
@@ -55,4 +152,12 @@ matrix:
     # NetBSD
     - env: TARGET=x86_64-unknown-netbsd
     # Emscripten
+    # stable
     - env: TARGET=asmjs-unknown-emscripten
+      rust: stable
+    # beta
+    - env: TARGET=asmjs-unknown-emscripten
+      rust: beta
+    # nightly 
+    - env: TARGET=asmjs-unknown-emscripten
+      rust: nightly 

@@ -18,7 +18,7 @@ no_std = ["page_size/no_std", "spin"]
 page_size = "^0.4.0"
 spin = { version = "^0.4.5", optional = true }
 
-[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+[target.'cfg(unix)'.dependencies]
 libc = "^0.2.31"
 
 [target.'cfg(target_os = "windows")'.dependencies]
