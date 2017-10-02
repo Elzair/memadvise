@@ -270,13 +270,17 @@ mod windows {
     #[cfg(not(feature = "no_std"))]
     use std::ptr;
 
+    #[cfg(feature = "no_std")]
+    use core::mem;
+    #[cfg(not(feature = "no_std"))]
+    use std::mem;
+
     use kernel32::{GetCurrentProcess, PrefetchVirtualMemory, VerifyVersionInfoA, VerSetConditionMask};
 
     use winapi::basetsd::{SIZE_T, ULONG_PTR};
     use winapi::memoryapi::{PWIN32_MEMORY_RANGE_ENTRY, WIN32_MEMORY_RANGE_ENTRY};
-    use winapi::minwindef::{BOOL, BYTE, DWORD, WORD};
-    use winapi::sysinfoapi::{SYSTEM_INFO, LPSYSTEM_INFO};
-    use winapi::winnt::{DWORDLONG, LPOSVERSIONINFOEXA, OSVERSIONINFOEXA, PVOID, ULONGLONG};
+    use winapi::minwindef::{BYTE, DWORD};
+    use winapi::winnt::{LPOSVERSIONINFOEXA, OSVERSIONINFOEXA, PVOID, ULONGLONG};
 
     #[cfg(feature = "no_std")]
     use spin::Once;
@@ -366,7 +370,7 @@ mod windows {
     #[inline]
     fn is_prefetch_supported() -> bool {
         static INIT: Once = ONCE_INIT;
-        static mut SUPPORTED: bool= 0;
+        static mut SUPPORTED: bool = false;
 
         unsafe {
             INIT.call_once(|| SUPPORTED = supported_helper());
