@@ -425,25 +425,28 @@ mod windows {
 
         #[test]
         fn test_windows_memadvise() {
-            let length = page_size::get();
+            let length = page_size::get() as SIZE_T;
 
             let address = unsafe {
                 VirtualAlloc(
                     ptr::null_mut() as LPVOID,
-                    length as SIZE_T,
+                    length,
                     MEM_COMMIT | MEM_RESERVE,
                     PAGE_READWRITE
-                ) as *mut ()
+                )
             };
 
             assert_ne!(address, ptr::null_mut() as LPVOID);
+
+            let addr = address as *mut ();
+            let len = length as usize;
             
-            match advise(address, length, Advice::WillNeed) {
+            match advise(addr, len, Advice::WillNeed) {
                 Ok(_) => {},
                 _ => { assert!(false); },
             }
                         
-            match advise(address, length, Advice::DontNeed) {
+            match advise(addr, len, Advice::DontNeed) {
                 Ok(_) => {},
                 _ => { assert!(false); },
             }
@@ -630,7 +633,7 @@ mod tests {
         use winapi::minwindef::{BOOL, DWORD, LPVOID};
         use winapi::winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE};
 
-        let length = page_size::get();
+        let length = page_size::get() as SIZE_T;
 
         let address = unsafe {
             VirtualAlloc(
@@ -642,13 +645,16 @@ mod tests {
         };
 
         assert_ne!(address, ptr::null_mut() as LPVOID);
+
+        let addr = address as *mut ();
+        let len = length as usize;
         
-        match advise(address, length, Advice::WillNeed) {
+        match advise(addr, len, Advice::WillNeed) {
             Ok(_) => {},
             _ => { assert!(false); },
         }
         
-        match advise(address, length, Advice::DontNeed) {
+        match advise(addr, len, Advice::DontNeed) {
             Ok(_) => {},
             _ => { assert!(false); },
         }
