@@ -423,10 +423,9 @@ mod windows {
 
         use super::*;
 
+        // Assume Windows8+.
         #[test]
-        #[ignore]
         fn test_is_prefetch_supported() {
-            // Assume Windows8+
             assert_eq!(is_prefetch_supported(), true);
             assert_eq!(is_prefetch_supported(), true);
         }
@@ -506,7 +505,6 @@ mod windows {
         // }
     }
 }
-
 
 // Stub Section
 
