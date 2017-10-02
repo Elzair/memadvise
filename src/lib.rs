@@ -144,11 +144,11 @@ mod unix {
 
         // Get Advice value
         let advice_internal = match advice {
-            Advice::DontNeed => DONTNEED,
-            Advice::Normal => NORMAL,
-            Advice::Random => RANDOM,
-            Advice::Sequential => SEQUENTIAL,
-            Advice::WillNeed => WILLNEED,
+            Advice::DontNeed => MADV_DONTNEED,
+            Advice::Normal => MADV_NORMAL,
+            Advice::Random => MADV_RANDOM,
+            Advice::Sequential => MADV_SEQUENTIAL,
+            Advice::WillNeed => MADV_WILLNEED,
         };
 
         let res = unsafe {
