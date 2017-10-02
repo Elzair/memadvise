@@ -492,9 +492,9 @@ mod windows {
 
             match advise(address, 64, Advice::Normal) {
                 Err(MemAdviseError::InvalidRange) => {},
-                Ok(_) => { ::std::println!("Valid Range!"); },
+                Ok(_) => { assert_eq!(3, 4); },
                 Err(MemAdviseError::UnalignedAddress) => {
-                    ::std::println!("Unaligned Address!");
+                    assert_eq!(5, 6);
                 },
                 _ => { assert!(false); },
             }
