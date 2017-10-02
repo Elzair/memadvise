@@ -492,6 +492,10 @@ mod windows {
 
             match advise(address, 64, Advice::Normal) {
                 Err(MemAdviseError::InvalidRange) => {},
+                Ok(_) => { println!("Valid Range!"); },
+                Err(MemAdviseError::UnalignedAddress) => {
+                    println!("Unaligned Address!");
+                },
                 _ => { assert!(false); },
             }
         }
