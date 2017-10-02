@@ -397,7 +397,7 @@ mod windows {
         };
         
         // Initialize version info.
-        let mut info: OSVERSIONINFOEXA = mem::zeroed();
+        let mut info: OSVERSIONINFOEXA = unsafe { mem::zeroed() };
         info.dwMajorVersion = 6 as DWORD;
         info.dwMinorVersion = 2 as DWORD;
 
