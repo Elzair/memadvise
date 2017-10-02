@@ -338,10 +338,10 @@ mod windows {
             NumberOfBytes: length as SIZE_T,
         };
 
-        // Do nothing if we are running on Windows 7.
-        if !is_prefetch_supported() {
-            return Ok(())
-        }
+        // // Do nothing if we are running on Windows 7.
+        // if !is_prefetch_supported() {
+        //     return Ok(())
+        // }
 
         let res = unsafe {
             PrefetchVirtualMemory(

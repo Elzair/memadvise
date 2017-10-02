@@ -146,11 +146,27 @@ matrix:
       env: TARGET=x86_64-apple-ios
       rust: nightly
     # FreeBSD
+    # x86_64
+    # stable
     - env: TARGET=x86_64-unknown-freebsd
-    # Fuchsia
-    - env: TARGET=x86_64-unknown-fuchsia
+      rust: stable
+    # beta
+    - env: TARGET=x86_64-unknown-freebsd
+      rust: beta
+    # nightly
+    - env: TARGET=x86_64-unknown-freebsd
+      rust: nightly
     # NetBSD
+    # x86_64
+    # stable
     - env: TARGET=x86_64-unknown-netbsd
+      rust: stable
+    # beta
+    - env: TARGET=x86_64-unknown-netbsd
+      rust: beta
+    # nightly
+    - env: TARGET=x86_64-unknown-netbsd
+      rust: nightly
     # Emscripten
     # stable
     - env: TARGET=asmjs-unknown-emscripten
