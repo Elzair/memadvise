@@ -43,5 +43,5 @@ test_script:
   - cargo build
   - cargo test
   - if [%CHANNEL%]==[nightly] (
-      cargo test --features "no-std"
+      cargo test --features "no_std"
     )
