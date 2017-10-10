@@ -96,7 +96,7 @@ pub enum MemAdviseError {
 
 #[cfg(unix)]
 #[inline]
-pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
+fn advise_helper(address: *mut (), length: usize, advice: Advice)
                             -> Result<(), MemAdviseError> {
     unix::advise(address, length, advice)
 }
@@ -261,7 +261,7 @@ mod unix {
 
 #[cfg(windows)]
 #[inline]
-pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
+fn advise_helper(address: *mut (), length: usize, advice: Advice)
                      -> Result<(), MemAdviseError> {
     windows::advise(address, length, advice)
 }
@@ -510,7 +510,7 @@ mod windows {
 
 #[cfg(not(any(unix, windows)))]
 #[inline]
-pub fn advise_helper(address: *mut (), length: usize, advice: Advice)
+fn advise_helper(address: *mut (), length: usize, advice: Advice)
                             -> Result<(), MemAdviseError> {
     stub::advise(address, length, advice)
 }
